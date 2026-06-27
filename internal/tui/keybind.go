@@ -33,7 +33,7 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.conn.SendSystemCode("security", "")
 		return m, nil
 	case "/":
-		m.conn.SendInput("[voice input]")
+		m.conn.SendVoice()
 		return m, nil
 	case "esc":
 		return m, nil
@@ -104,7 +104,7 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "/":
-		m.conn.SendInput("[voice input]")
+		m.conn.SendVoice()
 		return m, nil
 
 	default:
