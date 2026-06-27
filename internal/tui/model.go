@@ -166,7 +166,7 @@ func (m Model) View() string {
 	}
 
 	if m.connStatus == ConnFailed {
-		return m.renderError("Daemon unavailable. Check system.")
+		return m.renderError("\n\n  ⚠ SYSTEM HALTED\n\n  Raw Model integrity check failed.\n  CognitiveOS cannot operate without a verified guardrail.\n\n  Please reflash firmware.\n")
 	}
 
 	switch m.state {
