@@ -29,9 +29,6 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "ctrl+d":
 		return m, tea.Quit
-	case "ctrl+alt+s":
-		m.conn.SendSystemCode("security", "")
-		return m, nil
 	case "/":
 		m.conn.SendInput("[voice input]")
 		return m, nil
