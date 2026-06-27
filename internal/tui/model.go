@@ -51,7 +51,8 @@ type Model struct {
 
 type outputMsg string
 type statusMsg string
-type connStatusMsg connectionStatus
+	type connStatusMsg connectionStatus
+type reconnectMsg struct{}
 
 func NewModel(conn *client.Conn) Model {
 	return Model{
@@ -71,14 +72,28 @@ func (m Model) Init() tea.Cmd {
 
 func connectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
-		for i := 0; i < 30; i++ {
+		for i := 0; ; i++ {
+			if err := conn.Connect(); err == nil {
+				conn.RequestStatus()
+				return connStatusMsg(ConnConnected)
+			}
+			if i >= 30 {
+				return connStatusMsg(ConnFailed)
+			}
+			time.Sleep(time.Second)
+		}
+	}
+}
+
+func reconnectCmd(conn *client.Conn) tea.Cmd {
+	return func() tea.Msg {
+		for {
 			if err := conn.Connect(); err == nil {
 				conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
 			}
 			time.Sleep(time.Second)
 		}
-		return connStatusMsg(ConnFailed)
 	}
 }
 
@@ -106,7 +121,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.connStatus == ConnConnected {
 			return m, listenCmd(m.conn)
 		}
+		if m.connStatus == ConnFailed {
+			return m, reconnectCmd(m.conn)
+		}
 		return m, nil
+
+	case reconnectMsg:
+		if m.connStatus == ConnFailed || m.connStatus == ConnDisconnected {
+			if err := m.conn.Connect(); err == nil {
+				m.conn.RequestStatus()
+				m.connStatus = ConnConnected
+				return m, listenCmd(m.conn)
+			}
+		}
+		return m, reconnectCmd(m.conn)
 
 	case outputMsg:
 		m.output.Reset()
@@ -137,7 +165,7 @@ func listenCmd(conn *client.Conn) tea.Cmd {
 			select {
 			case env, ok := <-conn.Messages:
 				if !ok {
-					return connStatusMsg(ConnDisconnected)
+					return reconnectMsg{}
 				}
 				switch env.Type {
 				case "output_deliver":
@@ -165,8 +193,11 @@ func (m Model) View() string {
 		return "\n  Loading..."
 	}
 
+	if m.connStatus == ConnConnecting {
+		return "\n\n  Connecting...\n"
+	}
 	if m.connStatus == ConnFailed {
-		return m.renderError("\n\n  ⚠ SYSTEM HALTED\n\n  Raw Model integrity check failed.\n  CognitiveOS cannot operate without a verified guardrail.\n\n  Please reflash firmware.\n")
+		return "\n\n  ⚠ Daemon unavailable. Check system.\n\n  Retrying connection...\n"
 	}
 
 	switch m.state {
