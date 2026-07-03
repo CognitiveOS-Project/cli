@@ -161,10 +161,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func listenCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
-		for env, ok := range conn.Messages {
-			if !ok {
-				return reconnectMsg{}
-			}
+		for env := range conn.Messages {
 			switch env.Type {
 			case "output_deliver":
 				var payload struct {
@@ -182,7 +179,7 @@ func listenCmd(conn *client.Conn) tea.Cmd {
 				return statusMsg("audit received")
 			}
 		}
-		return nil
+		return reconnectMsg{}
 	}
 }
 
