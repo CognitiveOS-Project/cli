@@ -19,7 +19,7 @@ jobs:
         run: go build -o /dev/null ./cmd/cognitiveos-cli
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           args: --timeout=3m
