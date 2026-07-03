@@ -74,7 +74,7 @@ func connectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for i := 0; ; i++ {
 			if err := conn.Connect(); err == nil {
-				conn.RequestStatus()
+				_ = conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
 			}
 			if i >= 30 {
@@ -89,7 +89,7 @@ func reconnectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for {
 			if err := conn.Connect(); err == nil {
-				conn.RequestStatus()
+				_ = conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
 			}
 			time.Sleep(time.Second)
@@ -129,7 +129,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case reconnectMsg:
 		if m.connStatus == ConnFailed || m.connStatus == ConnDisconnected {
 			if err := m.conn.Connect(); err == nil {
-				m.conn.RequestStatus()
+				_ = m.conn.RequestStatus()
 				m.connStatus = ConnConnected
 				return m, listenCmd(m.conn)
 			}
@@ -161,30 +161,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func listenCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
-		for {
-			select {
-			case env, ok := <-conn.Messages:
-				if !ok {
-					return reconnectMsg{}
+		for env, ok := range conn.Messages {
+			if !ok {
+				return reconnectMsg{}
+			}
+			switch env.Type {
+			case "output_deliver":
+				var payload struct {
+					Content     string `json:"content"`
+					ContentType string `json:"content_type"`
 				}
-				switch env.Type {
-				case "output_deliver":
-					var payload struct {
-						Content     string `json:"content"`
-						ContentType string `json:"content_type"`
-					}
-					if err := 	json.Unmarshal(env.Payload, &payload); err == nil {
-						return outputMsg(payload.Content)
-					}
-				case "status_response":
-					return statusMsg("connected")
-				case "input_accepted":
-					return statusMsg("sent")
-				case "audit_report":
-					return statusMsg("audit received")
+				if err := json.Unmarshal(env.Payload, &payload); err == nil {
+					return outputMsg(payload.Content)
 				}
+			case "status_response":
+				return statusMsg("connected")
+			case "input_accepted":
+				return statusMsg("sent")
+			case "audit_report":
+				return statusMsg("audit received")
 			}
 		}
+		return nil
 	}
 }
 

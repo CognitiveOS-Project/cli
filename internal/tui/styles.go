@@ -80,6 +80,4 @@ var (
 			Foreground(lipgloss.Color("#9CA3AF")).
 			Align(lipgloss.Center).
 			Width(46)
-
-	separator = "─"
 )

@@ -67,7 +67,7 @@ func (c *Conn) Close() {
 		close(c.done)
 	}
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 	}
 }
 
