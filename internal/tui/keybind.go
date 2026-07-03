@@ -30,7 +30,7 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c", "ctrl+d":
 		return m, tea.Quit
 	case "/":
-		m.conn.SendVoice()
+		_ = m.conn.SendVoice()
 		return m, nil
 	case "esc":
 		return m, nil
@@ -56,8 +56,8 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.historyIdx = len(m.history)
 		m.input.Reset()
 		m.state = StateProcessing
-		m.conn.SendInput(input)
-		m.conn.RequestStatus()
+		_ = m.conn.SendInput(input)
+		_ = m.conn.RequestStatus()
 		return m, nil
 
 	case "esc":
@@ -101,7 +101,7 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "/":
-		m.conn.SendVoice()
+		_ = m.conn.SendVoice()
 		return m, nil
 
 	default:
@@ -144,7 +144,7 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.historyIdx = len(m.history)
 		m.input.Reset()
 		m.state = StateProcessing
-		m.conn.SendInput(input)
+		_ = m.conn.SendInput(input)
 		return m, nil
 
 	case "esc":
@@ -198,7 +198,7 @@ func (m Model) handleErrorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.historyIdx = len(m.history)
 			m.input.Reset()
 			m.state = StateProcessing
-			m.conn.SendInput(input)
+			_ = m.conn.SendInput(input)
 		} else {
 			m.state = StateIdle
 		}
@@ -227,7 +227,7 @@ func (m Model) handleCodeEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		code := m.codeInput.String()
 		if len(code) >= 4 {
-			m.conn.SendSystemCode("unlock", code)
+			_ = m.conn.SendSystemCode("unlock", code)
 			m.codeInput.Reset()
 			m.state = StateIdle
 		}
@@ -257,9 +257,6 @@ func (m Model) handleCodeEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			for _, r := range msg.String() {
 				if r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' {
 					m.codeInput.WriteString(strings.ToUpper(string(r)))
-					if m.codeInput.Len() == 4 || m.codeInput.Len() == 9 {
-						// auto-dash handled by typing it
-					}
 				}
 			}
 		}
