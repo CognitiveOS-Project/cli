@@ -73,6 +73,7 @@ func (m Model) Init() tea.Cmd {
 func connectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for i := 0; ; i++ {
+
 			if err := conn.Connect(); err == nil {
 				_ = conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
