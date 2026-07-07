@@ -13,7 +13,10 @@ The human interface — a Bubble Tea TUI that replaces the traditional desktop/a
 ## Build
 
 ```bash
-go build -o bin/cognitiveos-cli ./cmd/cognitiveos-cli
+make build    # compile to build/bin/cognitiveos-cli
+make test     # run tests
+make lint     # go vet
+make clean    # remove build artifacts
 ```
 
 ## Architecture
