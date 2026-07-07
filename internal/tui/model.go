@@ -89,22 +89,7 @@ func reconnectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for {
 			if err := conn.Connect(); err == nil {
-				_ = conn.RequestStatus()
-				return connStatusMsg(ConnConnected)
-			}
-			if i >= 30 {
-				return connStatusMsg(ConnFailed)
-			}
-			time.Sleep(time.Second)
-		}
-	}
-}
-
-func reconnectCmd(conn *client.Conn) tea.Cmd {
-	return func() tea.Msg {
-		for {
-			if err := conn.Connect(); err == nil {
-				_ = conn.RequestStatus()
+				conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
 			}
 			time.Sleep(time.Second)
@@ -182,18 +167,24 @@ func listenCmd(conn *client.Conn) tea.Cmd {
 				if !ok {
 					return reconnectMsg{}
 				}
-				if err := json.Unmarshal(env.Payload, &payload); err == nil {
-					return outputMsg(payload.Content)
+				switch env.Type {
+				case "output_deliver":
+					var payload struct {
+						Content     string `json:"content"`
+						ContentType string `json:"content_type"`
+					}
+					if err := json.Unmarshal(env.Payload, &payload); err == nil {
+						return outputMsg(payload.Content)
+					}
+				case "status_response":
+					return statusMsg("connected")
+				case "input_accepted":
+					return statusMsg("sent")
+				case "audit_report":
+					return statusMsg("audit received")
 				}
-			case "status_response":
-				return statusMsg("connected")
-			case "input_accepted":
-				return statusMsg("sent")
-			case "audit_report":
-				return statusMsg("audit received")
 			}
 		}
-		return reconnectMsg{}
 	}
 }
 
