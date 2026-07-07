@@ -73,7 +73,21 @@ func (m Model) Init() tea.Cmd {
 func connectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for i := 0; ; i++ {
+			if err := conn.Connect(); err == nil {
+				conn.RequestStatus()
+				return connStatusMsg(ConnConnected)
+			}
+			if i >= 30 {
+				return connStatusMsg(ConnFailed)
+			}
+			time.Sleep(time.Second)
+		}
+	}
+}
 
+func reconnectCmd(conn *client.Conn) tea.Cmd {
+	return func() tea.Msg {
+		for {
 			if err := conn.Connect(); err == nil {
 				_ = conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
@@ -130,7 +144,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case reconnectMsg:
 		if m.connStatus == ConnFailed || m.connStatus == ConnDisconnected {
 			if err := m.conn.Connect(); err == nil {
-				_ = m.conn.RequestStatus()
+				m.conn.RequestStatus()
 				m.connStatus = ConnConnected
 				return m, listenCmd(m.conn)
 			}
@@ -162,12 +176,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func listenCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
-		for env := range conn.Messages {
-			switch env.Type {
-			case "output_deliver":
-				var payload struct {
-					Content     string `json:"content"`
-					ContentType string `json:"content_type"`
+		for {
+			select {
+			case env, ok := <-conn.Messages:
+				if !ok {
+					return reconnectMsg{}
 				}
 				if err := json.Unmarshal(env.Payload, &payload); err == nil {
 					return outputMsg(payload.Content)

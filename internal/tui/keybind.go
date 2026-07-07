@@ -30,7 +30,7 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c", "ctrl+d":
 		return m, tea.Quit
 	case "/":
-		_ = m.conn.SendVoice()
+		m.conn.SendVoice()
 		return m, nil
 	case "esc":
 		return m, nil
@@ -101,7 +101,7 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "/":
-		_ = m.conn.SendVoice()
+		m.conn.SendVoice()
 		return m, nil
 
 	default:
