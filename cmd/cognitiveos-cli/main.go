@@ -26,8 +26,12 @@ func main() {
 			log.Fatalf("spawn cognitiveosd: %v", err)
 		}
 		defer func() {
-			cmd.Process.Signal(os.Interrupt)
-			cmd.Wait()
+			if err := cmd.Process.Signal(os.Interrupt); err != nil {
+				log.Printf("failed to signal cognitiveosd: %v", err)
+			}
+			if err := cmd.Wait(); err != nil {
+				log.Printf("cognitiveosd exited with error: %v", err)
+			}
 		}()
 		for i := 0; i < 8; i++ {
 			if _, err := os.Stat(*socketPath); err == nil {
