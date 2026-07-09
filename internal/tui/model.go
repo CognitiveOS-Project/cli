@@ -85,7 +85,7 @@ func connectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for i := 0; ; i++ {
 			if err := conn.Connect(); err == nil {
-				conn.RequestStatus()
+				_ = conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
 			}
 			if i >= 30 {
@@ -100,7 +100,7 @@ func reconnectCmd(conn *client.Conn) tea.Cmd {
 	return func() tea.Msg {
 		for {
 			if err := conn.Connect(); err == nil {
-				conn.RequestStatus()
+				_ = conn.RequestStatus()
 				return connStatusMsg(ConnConnected)
 			}
 			time.Sleep(time.Second)
@@ -130,6 +130,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case connStatusMsg:
 		m.connStatus = connectionStatus(msg)
 		if m.connStatus == ConnConnected {
+			if err := m.conn.RequestStatus(); err != nil {
+				m.state = StateError
+				m.errMsg = "failed to request initial status: " + err.Error()
+			}
 			return m, listenCmd(m.conn, &m)
 		}
 		if m.connStatus == ConnFailed {
@@ -140,7 +144,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case reconnectMsg:
 		if m.connStatus == ConnFailed || m.connStatus == ConnDisconnected {
 			if err := m.conn.Connect(); err == nil {
-				m.conn.RequestStatus()
+				_ = m.conn.RequestStatus()
 				m.connStatus = ConnConnected
 				return m, listenCmd(m.conn, &m)
 			}
@@ -181,38 +185,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func listenCmd(conn *client.Conn, model *Model) tea.Cmd {
 	return func() tea.Msg {
-		for {
-			select {
-			case env, ok := <-conn.Messages:
-				if !ok {
-					return reconnectMsg{}
+		for env := range conn.Messages {
+			switch env.Type {
+			case "output_deliver":
+				var payload struct {
+					Content     string `json:"content"`
+					ContentType string `json:"content_type"`
+					Media       *struct {
+						Type  string   `json:"type"`
+						Paths []string `json:"paths"`
+					} `json:"media,omitempty"`
 				}
-				switch env.Type {
-				case "output_deliver":
-					var payload struct {
-						Content     string `json:"content"`
-						ContentType string `json:"content_type"`
-						Media       *struct {
-							Type  string   `json:"type"`
-							Paths []string `json:"paths"`
-						} `json:"media,omitempty"`
+				if err := json.Unmarshal(env.Payload, &payload); err == nil {
+					if model != nil && payload.Media != nil {
+						model.mediaPayload.Type = payload.Media.Type
+						model.mediaPayload.Paths = payload.Media.Paths
 					}
-					if err := json.Unmarshal(env.Payload, &payload); err == nil {
-						if model != nil && payload.Media != nil {
-							model.mediaPayload.Type = payload.Media.Type
-							model.mediaPayload.Paths = payload.Media.Paths
-						}
-						return outputMsg{Content: payload.Content, ContentType: payload.ContentType}
-					}
-				case "status_response":
-					return statusMsg("connected")
-				case "input_accepted":
-					return statusMsg("sent")
-				case "audit_report":
-					return statusMsg("audit received")
+					return outputMsg{Content: payload.Content, ContentType: payload.ContentType}
 				}
+			case "status_response":
+				return statusMsg("connected")
+			case "input_accepted":
+				return statusMsg("sent")
+			case "audit_report":
+				return statusMsg("audit received")
 			}
 		}
+		return reconnectMsg{}
 	}
 }
 

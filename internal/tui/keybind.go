@@ -54,10 +54,10 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.confirming = false
 		return m, nil
 	case "/":
-		m.conn.SendVoice()
-		return m, nil
-	case "esc":
-		m.confirming = false
+		if err := m.conn.SendVoice(); err != nil {
+			m.state = StateError
+			m.errMsg = "failed to send voice command: " + err.Error()
+		}
 		return m, nil
 	default:
 		if m.confirming {
@@ -129,9 +129,11 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.ClearScreen
 
 	case "/":
-		m.conn.SendVoice()
+		if err := m.conn.SendVoice(); err != nil {
+			m.state = StateError
+			m.errMsg = "failed to send voice command: " + err.Error()
+		}
 		return m, nil
-
 	default:
 		if msg.Type == tea.KeyRunes {
 			m.input.WriteString(msg.String())
