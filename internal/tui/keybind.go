@@ -7,6 +7,15 @@ import (
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Alt && (msg.String() == "s" || msg.String() == "ctrl+s") {
+		_ = m.conn.SendSystemCode("security", "")
+		return m, nil
+	}
+	if msg.String() == "ctrl+alt+s" {
+		_ = m.conn.SendSystemCode("security", "")
+		return m, nil
+	}
+
 	switch m.state {
 	case StateIdle:
 		return m.handleIdleKey(msg)
@@ -27,14 +36,33 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "ctrl+d":
+	case "ctrl+c":
 		return m, tea.Quit
+	case "ctrl+d":
+		m.confirming = true
+		return m, nil
+	case "y", "Y":
+		if m.confirming {
+			m.confirming = false
+			_ = m.conn.SendSystemCode("idle", "")
+			return m, nil
+		}
+		m.state = StateListening
+		m.input.WriteString(msg.String())
+		return m, nil
+	case "n", "N":
+		m.confirming = false
+		return m, nil
 	case "/":
 		m.conn.SendVoice()
 		return m, nil
 	case "esc":
+		m.confirming = false
 		return m, nil
 	default:
+		if m.confirming {
+			return m, nil
+		}
 		if msg.Type == tea.KeyRunes {
 			m.input.WriteString(msg.String())
 			m.state = StateListening
@@ -117,11 +145,18 @@ func (m Model) handleProcessingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c", "esc":
 		m.state = StateIdle
 		m.input.Reset()
-		return m, nil
+		_ = m.conn.SendSystemCode("cancel", "")
+		return m, cancelProcessingCmd()
 	case "ctrl+l":
 		return m, tea.ClearScreen
 	default:
 		return m, nil
+	}
+}
+
+func cancelProcessingCmd() tea.Cmd {
+	return func() tea.Msg {
+		return cancelProcessingMsg{}
 	}
 }
 
@@ -132,10 +167,15 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if input == "" {
 			return m, nil
 		}
-		if strings.ToLower(input) == "close" || strings.ToLower(input) == "close_media" {
+		lower := strings.ToLower(input)
+		if lower == "close" || lower == "close_media" {
 			if m.state == StateMedia {
 				m.state = StateResponding
+				m.input.Reset()
 			}
+			return m, nil
+		}
+		if lower == "save" && m.state == StateMedia {
 			return m, nil
 		}
 		m.output.Reset()
@@ -148,6 +188,10 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "esc":
+		if m.state == StateMedia {
+			m.state = StateResponding
+			return m, nil
+		}
 		m.state = StateIdle
 		m.input.Reset()
 		m.output.Reset()
@@ -159,6 +203,25 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "tab":
+		return m, nil
+
+	case "up":
+		if len(m.history) > 0 && m.historyIdx > 0 {
+			m.historyIdx--
+			m.input.Reset()
+			m.input.WriteString(m.history[m.historyIdx])
+		}
+		return m, nil
+
+	case "down":
+		if m.historyIdx < len(m.history)-1 {
+			m.historyIdx++
+			m.input.Reset()
+			m.input.WriteString(m.history[m.historyIdx])
+		} else {
+			m.input.Reset()
+			m.historyIdx = len(m.history)
+		}
 		return m, nil
 
 	case "backspace":

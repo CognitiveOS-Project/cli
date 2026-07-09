@@ -47,19 +47,30 @@ type Model struct {
 	width        int
 	height       int
 	ready        bool
+	confirming   bool
+
+	mediaPayload struct {
+		Type  string   `json:"type"`
+		Paths []string `json:"paths"`
+	}
 }
 
-type outputMsg string
+type outputMsg struct {
+	Content     string `json:"content"`
+	ContentType string `json:"content_type"`
+}
+
 type statusMsg string
-	type connStatusMsg connectionStatus
+type connStatusMsg connectionStatus
 type reconnectMsg struct{}
+type cancelProcessingMsg struct{}
 
 func NewModel(conn *client.Conn) Model {
 	return Model{
-		state:      StateIdle,
-		conn:       conn,
-		connStatus: ConnDisconnected,
-		spinnerChars: []string{"|", "/", "-", "\\"},
+		state:        StateIdle,
+		conn:         conn,
+		connStatus:   ConnDisconnected,
+		spinnerChars: []string{".", "..", "..."},
 	}
 }
 
@@ -119,7 +130,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case connStatusMsg:
 		m.connStatus = connectionStatus(msg)
 		if m.connStatus == ConnConnected {
-			return m, listenCmd(m.conn)
+			return m, listenCmd(m.conn, &m)
 		}
 		if m.connStatus == ConnFailed {
 			return m, reconnectCmd(m.conn)
@@ -131,21 +142,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := m.conn.Connect(); err == nil {
 				m.conn.RequestStatus()
 				m.connStatus = ConnConnected
-				return m, listenCmd(m.conn)
+				return m, listenCmd(m.conn, &m)
 			}
 		}
 		return m, reconnectCmd(m.conn)
 
 	case outputMsg:
 		m.output.Reset()
-		m.output.WriteString(string(msg))
-		m.lastOutput = string(msg)
-		m.state = StateResponding
+		m.output.WriteString(msg.Content)
+		m.lastOutput = msg.Content
+		if msg.ContentType == "media" {
+			m.state = StateMedia
+		} else {
+			m.state = StateResponding
+		}
 		return m, nil
 
 	case statusMsg:
 		m.output.Reset()
 		m.output.WriteString(string(msg))
+		return m, nil
+
+	case cancelProcessingMsg:
+		m.state = StateIdle
+		m.input.Reset()
 		return m, nil
 
 	case spinnerTickMsg:
@@ -159,7 +179,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func listenCmd(conn *client.Conn) tea.Cmd {
+func listenCmd(conn *client.Conn, model *Model) tea.Cmd {
 	return func() tea.Msg {
 		for {
 			select {
@@ -172,9 +192,17 @@ func listenCmd(conn *client.Conn) tea.Cmd {
 					var payload struct {
 						Content     string `json:"content"`
 						ContentType string `json:"content_type"`
+						Media       *struct {
+							Type  string   `json:"type"`
+							Paths []string `json:"paths"`
+						} `json:"media,omitempty"`
 					}
 					if err := json.Unmarshal(env.Payload, &payload); err == nil {
-						return outputMsg(payload.Content)
+						if model != nil && payload.Media != nil {
+							model.mediaPayload.Type = payload.Media.Type
+							model.mediaPayload.Paths = payload.Media.Paths
+						}
+						return outputMsg{Content: payload.Content, ContentType: payload.ContentType}
 					}
 				case "status_response":
 					return statusMsg("connected")
@@ -209,6 +237,8 @@ func (m Model) View() string {
 		return m.renderProcessing()
 	case StateResponding:
 		return m.renderResponding()
+	case StateMedia:
+		return m.renderMedia()
 	case StateError:
 		return m.renderError(m.errMsg)
 	case StateCodeEntry:
@@ -223,7 +253,11 @@ func (m Model) renderIdle() string {
 	b.WriteString("\n\n")
 	b.WriteString(titleStyle.Render("CognitiveOS"))
 	b.WriteString("\n\n")
-	b.WriteString(indicatorDot.Render("●") + " " + readyText.Render("ready"))
+	if m.confirming {
+		b.WriteString(shutdownStyle.Render("Shutdown system?  [Y]es  [N]o"))
+	} else {
+		b.WriteString(indicatorDot.Render("●") + " " + readyText.Render("ready"))
+	}
 	b.WriteString("\n\n\n")
 	b.WriteString(hintStyle.Render("(press / to speak, type anything to begin)"))
 	b.WriteString("\n")
@@ -289,11 +323,84 @@ func (m Model) renderResponding() string {
 
 func (m Model) renderOutput(text string) string {
 	var b strings.Builder
+	inCodeBlock := false
 	for _, line := range strings.Split(text, "\n") {
-		b.WriteString(outputStyle.Render(line))
+		trimmed := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmed, "```") {
+			inCodeBlock = !inCodeBlock
+			if inCodeBlock {
+				b.WriteString(codeBlockStyle.Render(line))
+			} else {
+				b.WriteString(codeBlockStyle.Render(line))
+			}
+			b.WriteString("\n")
+			continue
+		}
+
+		if inCodeBlock {
+			b.WriteString(codeBlockStyle.Render(line))
+			b.WriteString("\n")
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+			b.WriteString(listStyle.Render("  " + trimmed))
+			b.WriteString("\n")
+			continue
+		}
+
+		if len(trimmed) > 2 && trimmed[0] >= '1' && trimmed[0] <= '9' && trimmed[1] == '.' {
+			b.WriteString(listStyle.Render("  " + trimmed))
+			b.WriteString("\n")
+			continue
+		}
+
+		if strings.Count(trimmed, "|") >= 3 && strings.Contains(trimmed, "-") {
+			b.WriteString(tableStyle.Render(trimmed))
+			b.WriteString("\n")
+			continue
+		}
+
+		rendered := renderURLs(line)
+		b.WriteString(outputStyle.Render(rendered))
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func renderURLs(text string) string {
+	var b strings.Builder
+	remaining := text
+	for {
+		idx := strings.Index(remaining, "http")
+		if idx < 0 {
+			b.WriteString(remaining)
+			break
+		}
+		b.WriteString(remaining[:idx])
+		url := remaining[idx:]
+		end := strings.IndexAny(url, " \t\n\r,.;:!?\"')")
+		if end > 0 {
+			url = url[:end]
+		}
+		b.WriteString(urlStyle.Render(url))
+		remaining = remaining[idx+len(url):]
+	}
+	return b.String()
+}
+
+func (m Model) renderMedia() string {
+	var b strings.Builder
+	b.WriteString("\n\n")
+	b.WriteString(mediaBarStyle.Render("[FRAMEBUFFER]"))
+	b.WriteString("\n\n")
+	b.WriteString(mediaTitleStyle.Render("Media: " + m.mediaPayload.Type))
+	b.WriteString("\n\n")
+	b.WriteString(mediaHintStyle.Render("Type \"close\" to return, \"save\" to store"))
+	b.WriteString("\n\n")
+	b.WriteString(promptStyle.Render("> ") + inputStyle.Render(m.input.String()))
+	return appStyle.Render(b.String())
 }
 
 func (m Model) renderError(msg string) string {

@@ -159,7 +159,7 @@ func TestOutputMsgTransition(t *testing.T) {
 	conn := client.New("/test.sock")
 	m := NewModel(conn)
 
-	msg := outputMsg("Hello from Wide Model")
+	msg := outputMsg{Content: "Hello from Wide Model", ContentType: "text"}
 	result, _ := m.Update(msg)
 	m2 := result.(Model)
 
@@ -168,6 +168,52 @@ func TestOutputMsgTransition(t *testing.T) {
 	}
 	if m2.lastOutput != "Hello from Wide Model" {
 		t.Fatalf("expected output, got '%s'", m2.lastOutput)
+	}
+}
+
+func TestOutputMsgMediaTransition(t *testing.T) {
+	conn := client.New("/test.sock")
+	m := NewModel(conn)
+
+	msg := outputMsg{Content: "Showing photo", ContentType: "media"}
+	result, _ := m.Update(msg)
+	m2 := result.(Model)
+
+	if m2.state != StateMedia {
+		t.Fatalf("expected media state, got %d", m2.state)
+	}
+	if m2.lastOutput != "Showing photo" {
+		t.Fatalf("expected output, got '%s'", m2.lastOutput)
+	}
+}
+
+func TestCtrlDFromIdleConfirmation(t *testing.T) {
+	conn := client.New("/test.sock")
+	m := NewModel(conn)
+
+	msg := tea.KeyMsg{Type: tea.KeyCtrlD}
+	result, _ := m.Update(msg)
+	m2 := result.(Model)
+
+	if m2.state != StateIdle {
+		t.Fatalf("expected idle after ctrl+d, got %d", m2.state)
+	}
+	if !m2.confirming {
+		t.Fatalf("expected confirming=true after ctrl+d")
+	}
+}
+
+func TestCtrlDConfirmYes(t *testing.T) {
+	conn := client.New("/test.sock")
+	m := NewModel(conn)
+	m.confirming = true
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}
+	result, _ := m.Update(msg)
+	m2 := result.(Model)
+
+	if m2.confirming {
+		t.Fatalf("expected confirming=false after yes")
 	}
 }
 

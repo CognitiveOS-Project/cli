@@ -80,4 +80,41 @@ var (
 			Foreground(lipgloss.Color("#9CA3AF")).
 			Align(lipgloss.Center).
 			Width(46)
+
+	shutdownStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#EF4444")).
+			Bold(true).
+			Align(lipgloss.Center).
+			Width(56)
+
+	mediaBarStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#10B981")).
+			Bold(true).
+			Align(lipgloss.Center).
+			Width(56)
+
+	mediaTitleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#D1D5DB")).
+			Align(lipgloss.Center).
+			Width(56)
+
+	mediaHintStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Align(lipgloss.Center).
+			Width(56)
+
+	codeBlockStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6B7280")).
+			Background(lipgloss.Color("#1F2937")).
+			Padding(0, 2)
+
+	listStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#D1D5DB"))
+
+	tableStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#D1D5DB"))
+
+	urlStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#60A5FA")).
+			Underline(true)
 )
