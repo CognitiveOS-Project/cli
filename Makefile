@@ -7,9 +7,13 @@ BUILD_DIR := build
 BIN_DIR := $(BUILD_DIR)/bin
 GO := go
 
-.PHONY: build test lint clean pack publish
-
+.PHONY: build test lint clean pack publish build-dependencies
+ 
+build-dependencies:
+	@echo "No external dependencies for cli"
+ 
 build: $(BIN_DIR)/cognitiveos-cli
+
 
 $(BIN_DIR)/cognitiveos-cli:
 	@mkdir -p $(BIN_DIR)
