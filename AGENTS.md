@@ -28,3 +28,10 @@ The TUI is thin — it captures input and displays output. All intelligence live
 - `github.com/charmbracelet/bubbletea`
 - `github.com/charmbracelet/lipgloss`
 - CognitiveOS internal: `cognitiveosd` daemon socket
+
+## Cloning Convention
+- Use SSH () for development.
+- Use HTTPS () for build scripts that clone public dependencies.
+## Cloning Convention
+- Use SSH (git@github.com:) for development.
+- Use HTTPS (https://github.com/) for build scripts that clone public dependencies.
