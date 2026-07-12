@@ -1,0 +1,9 @@
+{
+  "name": "cognitiveos-cli",
+  "version": "0.1.0",
+  "description": "CognitiveOS TUI frontend",
+  "hardware_requirements": {
+    "os": ["linux"],
+    "arch": ["amd64", "arm64"]
+  }
+}
