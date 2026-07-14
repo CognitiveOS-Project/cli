@@ -24,6 +24,7 @@ type Conn struct {
 	encoder  *json.Encoder
 	mu       sync.Mutex
 	done     chan struct{}
+	closeOnce sync.Once
 	Messages chan Envelope
 	Address  string
 }
@@ -60,12 +61,10 @@ func (c *Conn) Connect() error {
 }
 
 func (c *Conn) Close() {
-	select {
-	case <-c.done:
-		return
-	default:
+	c.closeOnce.Do(func() {
 		close(c.done)
-	}
+		close(c.Messages)
+	})
 	if c.conn != nil {
 		_ = c.conn.Close()
 	}
