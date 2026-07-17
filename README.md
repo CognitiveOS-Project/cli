@@ -1,6 +1,6 @@
 # cli — CognitiveOS TUI
 
-The human interface — a Go Bubble Tea TUI with 7 display modes. Replaces the traditional desktop/app paradigm with a clean terminal-based prompt.
+The human interface — a Go terminal user interface (TUI) with 7 display modes. Replaces the traditional desktop/app paradigm with a clean terminal-based prompt.
 
 ## Display Modes
 

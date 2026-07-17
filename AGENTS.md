@@ -1,6 +1,6 @@
 # CognitiveOS CLI (TUI)
 
-The human interface — a Bubble Tea TUI that replaces the traditional desktop/app paradigm.
+The human interface — a terminal user interface (TUI) that replaces the traditional desktop/app paradigm.
 
 ## Features
 
