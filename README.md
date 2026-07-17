@@ -41,6 +41,7 @@ The TUI connects to cognitiveosd via Unix socket at `/cognitiveos/run/daemon.soc
 - [cognitive-os.org](https://cognitive-os.org) — project website
 - [cognitiveosd](https://github.com/CognitiveOS-Project/cognitiveosd) — daemon that this TUI connects to
 - [core-mcp-bridges](https://github.com/CognitiveOS-Project/core-mcp-bridges) — display-mcp used for media rendering
+- [coginit](https://github.com/CognitiveOS-Project/coginit) — boot manager that supervises this CLI
 - [Product Specs](https://github.com/CognitiveOS-Project/product-specs) — CLI/TUI specification
 - [CognitiveOS Project](https://github.com/CognitiveOS-Project) — GitHub organization
 
