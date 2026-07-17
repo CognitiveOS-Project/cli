@@ -1,6 +1,11 @@
-# CognitiveOS CLI (TUI)
+# CognitiveOS CLI
 
-The human interface — a terminal user interface (TUI) that replaces the traditional desktop/app paradigm.
+The human interface to CognitiveOS. Two modes: interactive TUI for live sessions, non-interactive CLI for scripting.
+
+## Modes
+
+- **TUI** (default): Bubble Tea interactive terminal with 7 display modes, keybindings, voice input
+- **CLI** (`--cmd`): Send command, print response, exit. `--json` for full envelope output.
 
 ## Features
 
@@ -9,6 +14,7 @@ The human interface — a terminal user interface (TUI) that replaces the tradit
 - Text input for keyboard interaction
 - Direct framebuffer overlay for images/video (communicates with display-mcp)
 - Connects to cognitiveosd via Unix socket
+- Non-interactive mode for scripting and automation
 
 ## Build
 
@@ -21,17 +27,22 @@ make clean    # remove build artifacts
 
 ## Architecture
 
-The TUI is thin — it captures input and displays output. All intelligence lives in cognitiveosd and the Wide Model. The TUI can crash and restart without affecting the OS.
+Both modes use the same `internal/client` package to communicate with `cognitiveosd` via Unix socket. The TUI is thin — it captures input and displays output. All intelligence lives in cognitiveosd and the Wide Model. Either interface can crash and restart without affecting the OS.
+
+```
+cmd/cognitiveos-cli/   Entry point, flag parsing
+internal/
+├── client/            Unix socket client (shared by both modes)
+├── cli/               Non-interactive CLI mode
+└── tui/               Interactive TUI mode (Bubble Tea)
+```
 
 ## Dependencies
 
-- `github.com/charmbracelet/bubbletea`
-- `github.com/charmbracelet/lipgloss`
+- `github.com/charmbracelet/bubbletea` — TUI framework (TUI mode only)
+- `github.com/charmbracelet/lipgloss` — terminal styling (TUI mode only)
 - CognitiveOS internal: `cognitiveosd` daemon socket
 
-## Cloning Convention
-- Use SSH () for development.
-- Use HTTPS () for build scripts that clone public dependencies.
 ## Cloning Convention
 - Use SSH (git@github.com:) for development.
 - Use HTTPS (https://github.com/) for build scripts that clone public dependencies.

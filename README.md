@@ -1,8 +1,17 @@
-# cli — CognitiveOS TUI
+# cognitiveos-cli — CognitiveOS Terminal Interface
 
-The human interface — a Go terminal user interface (TUI) with 7 display modes. Replaces the traditional desktop/app paradigm with a clean terminal-based prompt.
+The human interface to CognitiveOS. Operates in two modes: an interactive TUI (terminal user interface) for live sessions, and a non-interactive CLI for scripting and automation.
 
-## Display Modes
+## Modes
+
+### TUI Mode (default)
+
+Interactive terminal UI with 7 display modes. Replaces the traditional desktop/app paradigm with a clean terminal-based prompt.
+
+```
+cognitiveos-cli              # default
+cognitiveos-cli --tui        # explicit
+```
 
 | Mode | Description |
 |------|-------------|
@@ -13,8 +22,6 @@ The human interface — a Go terminal user interface (TUI) with 7 display modes.
 | **error** | Red error state with message |
 | **code entry** | Multi-line text input for code blocks |
 
-## Keybindings
-
 | Key | Action |
 |-----|--------|
 | `Esc` | Cancel / back |
@@ -22,28 +29,62 @@ The human interface — a Go terminal user interface (TUI) with 7 display modes.
 | `Enter` | Submit text |
 | `Tab` | Cycle display modes (debug) |
 
-## Build
+### CLI Mode (non-interactive)
 
-```bash
-make build
+Send a command, print the response, and exit. Useful for scripting, automation, and pipes.
+
+```
+cognitiveos-cli --cmd "what time is it"
+cognitiveos-cli --cmd "show me my photos" --json
 ```
 
-The TUI connects to cognitiveosd via Unix socket at `/cognitiveos/run/daemon.sock` with 30s retry. It is thin by design — all intelligence lives in the daemon and Wide Model. The TUI can crash and restart without affecting the OS.
+| Flag | Description |
+|------|-------------|
+| `--cmd <text>` | Send a command and print the response |
+| `--json` | Print the full JSON envelope (requires `--cmd`) |
 
-## Dependencies
+Plain text output (default):
+```
+$ cognitiveos-cli --cmd "what time is it"
+The time is 3:42 PM.
+```
 
-- `github.com/charmbracelet/bubbletea`
-- `github.com/charmbracelet/lipgloss`
+JSON output:
+```
+$ cognitiveos-cli --cmd "what time is it" --json
+{
+  "type": "output_deliver",
+  "id": "a1b2c3d4-...",
+  "from": "cognitiveosd",
+  "payload": {
+    "content": "The time is 3:42 PM."
+  }
+}
+```
 
-## Related
+## Flags
 
-- [CognitiveOS](https://github.com/CognitiveOS-Project/cognitiveos) — main project repository
-- [cognitive-os.org](https://cognitive-os.org) — project website
-- [cognitiveosd](https://github.com/CognitiveOS-Project/cognitiveosd) — daemon that this TUI connects to
-- [core-mcp-bridges](https://github.com/CognitiveOS-Project/core-mcp-bridges) — display-mcp used for media rendering
-- [coginit](https://github.com/CognitiveOS-Project/coginit) — boot manager that supervises this CLI
-- [Product Specs](https://github.com/CognitiveOS-Project/product-specs) — CLI/TUI specification
-- [CognitiveOS Project](https://github.com/CognitiveOS-Project) — GitHub organization
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--socket` | `/cognitiveos/run/daemon.sock` | Daemon socket path |
+| `--tui` | `false` | Launch interactive TUI (same as default) |
+| `--cmd <text>` | — | Send command, print response, exit |
+| `--json` | `false` | Print full JSON envelope (requires `--cmd`) |
+| `--version` | — | Print version and exit |
+| `--help` | — | Print usage |
+
+## Architecture
+
+Both modes use the same `internal/client` package to communicate with `cognitiveosd` via Unix socket. The TUI is thin — it captures input and displays output. All intelligence lives in the daemon and Wide Model. Either interface can crash and restart without affecting the OS.
+
+```
+cognitiveos-cli
+├── cmd/cognitiveos-cli/   Entry point, flag parsing
+├── internal/
+│   ├── client/            Unix socket client (shared by both modes)
+│   ├── cli/               Non-interactive CLI mode
+│   └── tui/               Interactive TUI mode (Bubble Tea)
+```
 
 ## Build
 
@@ -53,6 +94,22 @@ make test     # Run tests
 make lint     # Run go vet
 make clean    # Remove build artifacts
 ```
+
+## Dependencies
+
+- `github.com/charmbracelet/bubbletea` — TUI framework (TUI mode only)
+- `github.com/charmbracelet/lipgloss` — terminal styling (TUI mode only)
+- CognitiveOS internal: `cognitiveosd` daemon socket
+
+## Related
+
+- [CognitiveOS](https://github.com/CognitiveOS-Project/cognitiveos) — main project repository
+- [cognitive-os.org](https://cognitive-os.org) — project website
+- [cognitiveosd](https://github.com/CognitiveOS-Project/cognitiveosd) — daemon that this tool connects to
+- [core-mcp-bridges](https://github.com/CognitiveOS-Project/core-mcp-bridges) — display-mcp used for media rendering
+- [coginit](https://github.com/CognitiveOS-Project/coginit) — boot manager that supervises this binary
+- [Product Specs](https://github.com/CognitiveOS-Project/product-specs) — CLI/TUI specification
+- [CognitiveOS Project](https://github.com/CognitiveOS-Project) — GitHub organization
 
 ## Contributing
 
