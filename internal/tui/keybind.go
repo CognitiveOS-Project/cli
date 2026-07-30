@@ -21,6 +21,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleIdleKey(msg)
 	case StateListening:
 		return m.handleListeningKey(msg)
+	case StateVoiceRecording:
+		return m.handleVoiceRecordingKey(msg)
 	case StateProcessing:
 		return m.handleProcessingKey(msg)
 	case StateResponding:
@@ -57,8 +59,11 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err := m.conn.SendVoice(); err != nil {
 			m.state = StateError
 			m.errMsg = "failed to send voice command: " + err.Error()
+			return m, nil
 		}
-		return m, nil
+		m.state = StateVoiceRecording
+		m.waveformIdx = 0
+		return m, spinnerTickCmd()
 	default:
 		if m.confirming {
 			return m, nil
@@ -67,6 +72,16 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input.WriteString(msg.String())
 			m.state = StateListening
 		}
+		return m, nil
+	}
+}
+
+func (m Model) handleVoiceRecordingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.state = StateIdle
+		return m, nil
+	default:
 		return m, nil
 	}
 }

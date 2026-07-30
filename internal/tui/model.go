@@ -15,6 +15,7 @@ type State int
 const (
 	StateIdle State = iota
 	StateListening
+	StateVoiceRecording
 	StateProcessing
 	StateResponding
 	StateMedia
@@ -55,10 +56,12 @@ type Model struct {
 		Paths []string `json:"paths"`
 	}
 
-	actions     []string
-	actionIdx   int
-	showActions bool
-	scrollOffset int
+	actions       []string
+	actionIdx     int
+	showActions   bool
+	scrollOffset  int
+	waveformIdx   int
+	waveformFrames []string
 }
 
 type outputMsg struct {
@@ -73,11 +76,12 @@ type cancelProcessingMsg struct{}
 
 func NewModel(conn *client.Conn) Model {
 	return Model{
-		state:        StateIdle,
-		conn:         conn,
-		connStatus:   ConnDisconnected,
-		spinnerChars: []string{".", "..", "..."},
-		actions:      []string{},
+		state:          StateIdle,
+		conn:           conn,
+		connStatus:     ConnDisconnected,
+		spinnerChars:   []string{".", "..", "..."},
+		actions:        []string{},
+		waveformFrames: []string{"▁", "▁▂", "▃", "▄", "▅", "▆", "▇", "█"},
 	}
 }
 
@@ -188,6 +192,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == StateProcessing {
 			m.spinnerIdx = (m.spinnerIdx + 1) % len(m.spinnerChars)
 		}
+		if m.state == StateVoiceRecording {
+			m.waveformIdx++
+		}
 		return m, spinnerTickCmd()
 
 	default:
@@ -244,6 +251,8 @@ func (m Model) View() string {
 		return m.renderIdle()
 	case StateListening:
 		return m.renderListening()
+	case StateVoiceRecording:
+		return m.renderVoiceRecording()
 	case StateProcessing:
 		return m.renderProcessing()
 	case StateResponding:
@@ -289,6 +298,17 @@ func (m Model) renderListening() string {
 	b.WriteString(promptStyle.Render("> ") + inputStyle.Render(m.input.String()))
 	b.WriteString("\n\n")
 	b.WriteString(keyHintStyle.Render("[Enter] send  [Esc] cancel"))
+	b.WriteString("\n")
+	return appStyle.Render(b.String())
+}
+
+func (m Model) renderVoiceRecording() string {
+	var b strings.Builder
+	b.WriteString("\n\n")
+	w := m.waveformFrames[m.waveformIdx%len(m.waveformFrames)]
+	b.WriteString(voiceWaveformStyle.Render("🎤 " + w))
+	b.WriteString("\n\n")
+	b.WriteString(keyHintStyle.Render("[Esc] cancel"))
 	b.WriteString("\n")
 	return appStyle.Render(b.String())
 }

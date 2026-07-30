@@ -131,4 +131,10 @@ var (
 				Foreground(lipgloss.Color("#6B7280")).
 				Italic(true).
 				Padding(0, 2)
+
+	voiceWaveformStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#10B981")).
+				Bold(true).
+				Align(lipgloss.Center).
+				Width(56)
 )
