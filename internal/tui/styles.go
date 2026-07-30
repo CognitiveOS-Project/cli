@@ -126,4 +126,9 @@ var (
 	actionInactiveStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#6B7280")).
 				Padding(0, 1)
+
+	scrollIndicatorStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#6B7280")).
+				Italic(true).
+				Padding(0, 2)
 )

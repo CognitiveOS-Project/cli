@@ -2,6 +2,7 @@ package tui
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -54,9 +55,10 @@ type Model struct {
 		Paths []string `json:"paths"`
 	}
 
-	actions    []string
-	actionIdx  int
+	actions     []string
+	actionIdx   int
 	showActions bool
+	scrollOffset int
 }
 
 type outputMsg struct {
@@ -160,6 +162,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.output.Reset()
 		m.output.WriteString(msg.Content)
 		m.lastOutput = msg.Content
+		m.scrollOffset = 0
 		if msg.ContentType == "media" {
 			m.state = StateMedia
 			m.actions = []string{"close", "save"}
@@ -313,8 +316,33 @@ func (m Model) renderResponding() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	lines := strings.Split(m.output.String(), "\n")
-	for _, line := range lines {
+	visibleHeight := m.height - 8
+	if m.lastOutput != "" {
+		lastLines := strings.Count(m.lastOutput, "\n") + 1
+		visibleHeight -= lastLines
+	}
+	visibleHeight -= 3 // separator + input + hints
+	if visibleHeight < 1 {
+		visibleHeight = 1
+	}
+	start := m.scrollOffset
+	if start >= len(lines) {
+		start = 0
+	}
+	end := start + visibleHeight
+	if end > len(lines) {
+		end = len(lines)
+	}
+	if m.scrollOffset > 0 {
+		b.WriteString(scrollIndicatorStyle.Render("▲"))
+		b.WriteString("\n")
+	}
+	for _, line := range lines[start:end] {
 		b.WriteString(promptStyle.Render("> ") + outputStyle.Render(line))
+		b.WriteString("\n")
+	}
+	if end < len(lines) {
+		b.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("▼ %d more lines", len(lines)-end)))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
@@ -333,6 +361,9 @@ func (m Model) renderResponding() string {
 			}
 			b.WriteString(" ")
 		}
+		b.WriteString("\n")
+	} else if m.scrollOffset > 0 || end < len(lines) {
+		b.WriteString(keyHintStyle.Render("[Enter] send  [Esc] idle  [Shift+↑/↓] scroll"))
 		b.WriteString("\n")
 	} else {
 		b.WriteString(keyHintStyle.Render("[Enter] send  [Esc] idle  [Tab] actions"))

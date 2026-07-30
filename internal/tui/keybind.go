@@ -203,6 +203,7 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.output.Reset()
 		m.output.WriteString(input)
+		m.scrollOffset = 0
 		m.history = append(m.history, input)
 		m.historyIdx = len(m.history)
 		m.input.Reset()
@@ -232,6 +233,37 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.showActions = true
 			m.actionIdx = 0
+		}
+		return m, nil
+
+	case "shift+up":
+		if m.scrollOffset > 0 {
+			m.scrollOffset--
+		}
+		return m, nil
+
+	case "shift+down":
+		lines := strings.Split(m.output.String(), "\n")
+		if m.scrollOffset < len(lines)-1 {
+			m.scrollOffset++
+		}
+		return m, nil
+
+	case "pgup":
+		m.scrollOffset -= m.height / 2
+		if m.scrollOffset < 0 {
+			m.scrollOffset = 0
+		}
+		return m, nil
+
+	case "pgdown":
+		lines := strings.Split(m.output.String(), "\n")
+		m.scrollOffset += m.height / 2
+		if m.scrollOffset >= len(lines) {
+			m.scrollOffset = len(lines) - 1
+		}
+		if m.scrollOffset < 0 {
+			m.scrollOffset = 0
 		}
 		return m, nil
 
