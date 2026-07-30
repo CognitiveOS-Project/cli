@@ -117,4 +117,13 @@ var (
 	urlStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#60A5FA")).
 			Underline(true)
+
+	actionActiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#10B981")).
+				Bold(true).
+				Padding(0, 1)
+
+	actionInactiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#6B7280")).
+				Padding(0, 1)
 )

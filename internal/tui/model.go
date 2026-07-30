@@ -53,6 +53,10 @@ type Model struct {
 		Type  string   `json:"type"`
 		Paths []string `json:"paths"`
 	}
+
+	actions    []string
+	actionIdx  int
+	showActions bool
 }
 
 type outputMsg struct {
@@ -71,6 +75,7 @@ func NewModel(conn *client.Conn) Model {
 		conn:         conn,
 		connStatus:   ConnDisconnected,
 		spinnerChars: []string{".", "..", "..."},
+		actions:      []string{},
 	}
 }
 
@@ -157,9 +162,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastOutput = msg.Content
 		if msg.ContentType == "media" {
 			m.state = StateMedia
+			m.actions = []string{"close", "save"}
 		} else {
 			m.state = StateResponding
+			m.actions = []string{"retry", "close"}
 		}
+		m.actionIdx = 0
+		m.showActions = false
 		return m, nil
 
 	case statusMsg:
@@ -315,8 +324,20 @@ func (m Model) renderResponding() string {
 	b.WriteString("\n")
 	b.WriteString(promptStyle.Render("> ") + inputStyle.Render(m.input.String()))
 	b.WriteString("\n\n")
-	b.WriteString(keyHintStyle.Render("[Enter] send  [Esc] idle  [Tab] actions"))
-	b.WriteString("\n")
+	if m.showActions && len(m.actions) > 0 {
+		for i, a := range m.actions {
+			if i == m.actionIdx {
+				b.WriteString(actionActiveStyle.Render("[" + a + "]"))
+			} else {
+				b.WriteString(actionInactiveStyle.Render("[" + a + "]"))
+			}
+			b.WriteString(" ")
+		}
+		b.WriteString("\n")
+	} else {
+		b.WriteString(keyHintStyle.Render("[Enter] send  [Esc] idle  [Tab] actions"))
+		b.WriteString("\n")
+	}
 	return appStyle.Render(b.String())
 }
 

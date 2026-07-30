@@ -165,6 +165,27 @@ func cancelProcessingCmd() tea.Cmd {
 func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
+		if m.showActions && len(m.actions) > 0 {
+			action := m.actions[m.actionIdx]
+			m.showActions = false
+			switch action {
+			case "retry":
+				input := m.output.String()
+				if input == "" {
+					return m, nil
+				}
+				m.state = StateProcessing
+				_ = m.conn.SendInput(input)
+				return m, nil
+			case "close":
+				m.state = StateIdle
+				m.input.Reset()
+				m.output.Reset()
+				return m, nil
+			case "save":
+				return m, nil
+			}
+		}
 		input := m.input.String()
 		if input == "" {
 			return m, nil
@@ -194,6 +215,7 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = StateResponding
 			return m, nil
 		}
+		m.showActions = false
 		m.state = StateIdle
 		m.input.Reset()
 		m.output.Reset()
@@ -205,6 +227,12 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "tab":
+		if m.showActions {
+			m.actionIdx = (m.actionIdx + 1) % len(m.actions)
+		} else {
+			m.showActions = true
+			m.actionIdx = 0
+		}
 		return m, nil
 
 	case "up":
