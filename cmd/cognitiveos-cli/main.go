@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/CognitiveOS-Project/cli/internal/client"
 	"github.com/CognitiveOS-Project/cli/internal/cli"
+	"github.com/CognitiveOS-Project/cli/internal/client"
 	"github.com/CognitiveOS-Project/cli/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )

@@ -74,7 +74,7 @@ var (
 			Width(46)
 
 	maskedInputStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#F59E0B"))
+				Foreground(lipgloss.Color("#F59E0B"))
 
 	codeHintStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#9CA3AF")).

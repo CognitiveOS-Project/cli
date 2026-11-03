@@ -19,14 +19,14 @@ type Envelope struct {
 }
 
 type Conn struct {
-	conn     *net.UnixConn
-	reader   *bufio.Scanner
-	encoder  *json.Encoder
-	mu       sync.Mutex
-	done     chan struct{}
+	conn      *net.UnixConn
+	reader    *bufio.Scanner
+	encoder   *json.Encoder
+	mu        sync.Mutex
+	done      chan struct{}
 	closeOnce sync.Once
-	Messages chan Envelope
-	Address  string
+	Messages  chan Envelope
+	Address   string
 }
 
 func New(address string) *Conn {

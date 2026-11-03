@@ -56,11 +56,11 @@ type Model struct {
 		Paths []string `json:"paths"`
 	}
 
-	actions       []string
-	actionIdx     int
-	showActions   bool
-	scrollOffset  int
-	waveformIdx   int
+	actions        []string
+	actionIdx      int
+	showActions    bool
+	scrollOffset   int
+	waveformIdx    int
 	waveformFrames []string
 }
 
