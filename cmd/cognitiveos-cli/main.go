@@ -17,12 +17,26 @@ import (
 var version = "dev"
 
 func main() {
+	// Ensure terminal is restored on panic/crash
+	defer func() {
+		if r := recover(); r != nil {
+			// Restore terminal on panic to prevent buffer issues
+			fmt.Fprintf(os.Stderr, "\n\nCognitiveOS CLI panicked: %v\n", r)
+			fmt.Fprintf(os.Stderr, "Restoring terminal...\n")
+			// Attempt to exit alt screen and restore normal terminal
+			fmt.Print("\033[?1049l") // Exit alternate screen
+			fmt.Print("\033[?25h")   // Show cursor
+			fmt.Print("\033[0m")     // Reset attributes
+			os.Exit(1)
+		}
+	}()
+
 	fs := flag.NewFlagSet("cognitiveos-cli", flag.ExitOnError)
 	socketPath := fs.String("socket", "/cognitiveos/run/daemon.sock", "daemon socket path")
 	tuiMode := fs.Bool("tui", false, "launch interactive TUI (default)")
 	cmdText := fs.String("cmd", "", "send a command and print the response (non-interactive)")
 	jsonOutput := fs.Bool("json", false, "print full JSON envelope (requires --cmd)")
-	showVersion := fs.Bool("version", false, "print version and exit")
+	showVersion := fs.Bool("version", false, "print version")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "cognitiveos-cli — CognitiveOS terminal interface\n\n")
@@ -96,6 +110,10 @@ func main() {
 	)
 
 	if _, err := p.Run(); err != nil {
+		// Restore terminal on program error
+		fmt.Print("\033[?1049l") // Exit alternate screen
+		fmt.Print("\033[?25h")   // Show cursor
+		fmt.Print("\033[0m")     // Reset attributes
 		log.Fatal(fmt.Errorf("program error: %w", err))
 	}
 
