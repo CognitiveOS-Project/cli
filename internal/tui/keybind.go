@@ -64,6 +64,13 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = StateVoiceRecording
 		m.waveformIdx = 0
 		return m, spinnerTickCmd()
+	case " ":
+		if m.confirming {
+			return m, nil
+		}
+		m.input.WriteString(" ")
+		m.state = StateListening
+		return m, nil
 	default:
 		if m.confirming {
 			return m, nil
@@ -166,7 +173,13 @@ func (m Model) handleProcessingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cancelProcessingCmd()
 	case "ctrl+l":
 		return m, tea.ClearScreen
+	case " ":
+		m.input.WriteString(" ")
+		return m, nil
 	default:
+		if msg.Type == tea.KeyRunes {
+			m.input.WriteString(msg.String())
+		}
 		return m, nil
 	}
 }
@@ -282,6 +295,10 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case " ":
+		m.input.WriteString(" ")
+		return m, nil
+
 	case "up":
 		if len(m.history) > 0 && m.historyIdx > 0 {
 			m.historyIdx--
@@ -352,6 +369,10 @@ func (m Model) handleErrorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input.Reset()
 			m.input.WriteString(s[:len(s)-1])
 		}
+		return m, nil
+
+	case " ":
+		m.input.WriteString(" ")
 		return m, nil
 
 	default:
