@@ -1,15 +1,15 @@
 package client
 
 import (
-	"bufio"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"net"
 	"sync"
 	"time"
+
+	"github.com/CognitiveOS-Project/cogsdk/client/daemon"
 )
 
+// Envelope is a JSON-RPC style message envelope sent over the daemon socket.
 type Envelope struct {
 	Type      string          `json:"type"`
 	ID        string          `json:"id,omitempty"`
@@ -18,98 +18,75 @@ type Envelope struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
+// Conn is a client connection to the cognitiveosd daemon.
+// It wraps cogsdk/client/daemon.Client to provide the same API that the
+// rest of the cli codebase expects.
 type Conn struct {
-	conn     *net.UnixConn
-	reader   *bufio.Scanner
-	encoder  *json.Encoder
-	mu       sync.Mutex
-	done     chan struct{}
+	inner   *daemon.Client
+	addr    string
+	done    chan struct{}
 	closeOnce sync.Once
 	Messages chan Envelope
-	Address  string
 }
 
+// New creates a new connection to the cognitiveosd daemon socket.
+// If address is empty, the default socket path is used.
 func New(address string) *Conn {
 	if address == "" {
-		address = "/cognitiveos/run/daemon.sock"
+		address = daemon.DefaultSocketPath()
 	}
 	return &Conn{
-		Address:  address,
-		done:     make(chan struct{}),
+		addr:    address,
+		done:    make(chan struct{}),
 		Messages: make(chan Envelope, 64),
 	}
 }
 
+// Address returns the socket address this connection uses.
+func (c *Conn) Address() string {
+	return c.addr
+}
+
+// Connect establishes a connection to the daemon socket.
 func (c *Conn) Connect() error {
-	addr, err := net.ResolveUnixAddr("unix", c.Address)
+	cli, err := daemon.DialPath(c.addr)
 	if err != nil {
-		return fmt.Errorf("resolve: %w", err)
+		return fmt.Errorf("daemon connection failed: %w", err)
 	}
-
-	conn, err := net.DialUnix("unix", nil, addr)
-	if err != nil {
-		return fmt.Errorf("dial: %w", err)
-	}
-
-	c.conn = conn
-	c.reader = bufio.NewScanner(conn)
-	c.reader.Buffer(make([]byte, 65536), 1048576)
-	c.encoder = json.NewEncoder(conn)
-
+	cli.SetReadTimeout(5 * time.Second)
+	c.inner = cli
 	go c.readLoop()
 	return nil
 }
 
+// Close closes the connection.
 func (c *Conn) Close() {
 	c.closeOnce.Do(func() {
 		close(c.done)
 		close(c.Messages)
 	})
-	if c.conn != nil {
-		_ = c.conn.Close()
+	if c.inner != nil {
+		_ = c.inner.Close()
 	}
 }
 
+// Send sends an envelope over the connection.
 func (c *Conn) Send(env Envelope) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	select {
-	case <-c.done:
-		return fmt.Errorf("connection closed")
-	default:
-	}
-	if c.encoder == nil {
+	if c.inner == nil {
 		return fmt.Errorf("not connected")
 	}
-	return c.encoder.Encode(env)
+	return c.inner.SendEnvelope(daemon.Envelope(env))
 }
 
-func uuidV4() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand failed: " + err.Error())
-	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
+// SendMessage sends a typed message over the connection.
 func (c *Conn) SendMessage(msgType string, payload interface{}) error {
-	env := Envelope{
-		Type:      msgType,
-		ID:        uuidV4(),
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		From:      "cli",
+	if c.inner == nil {
+		return fmt.Errorf("not connected")
 	}
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	env.Payload = b
-	return c.Send(env)
+	return c.inner.SendMessage(msgType, payload)
 }
 
+// SendInput sends an input_forward message to the daemon.
 func (c *Conn) SendInput(content string) error {
 	return c.SendMessage("input_forward", map[string]interface{}{
 		"mode":    "text",
@@ -120,6 +97,7 @@ func (c *Conn) SendInput(content string) error {
 	})
 }
 
+// SendVoice sends a voice command to the daemon.
 func (c *Conn) SendVoice() error {
 	return c.SendMessage("input_forward", map[string]interface{}{
 		"mode":    "voice",
@@ -130,6 +108,7 @@ func (c *Conn) SendVoice() error {
 	})
 }
 
+// SendSystemCode sends a system code to the daemon.
 func (c *Conn) SendSystemCode(code string, unlockCode string) error {
 	payload := map[string]interface{}{
 		"code":   code,
@@ -141,14 +120,17 @@ func (c *Conn) SendSystemCode(code string, unlockCode string) error {
 	return c.SendMessage("system_code", payload)
 }
 
+// RequestStatus sends a status request to the daemon.
 func (c *Conn) RequestStatus() error {
 	return c.SendMessage("status_request", map[string]interface{}{})
 }
 
+// RequestAudit sends an audit request to the daemon.
 func (c *Conn) RequestAudit() error {
 	return c.SendMessage("audit_request", map[string]interface{}{})
 }
 
+// IsClosed returns true if the connection has been closed.
 func (c *Conn) IsClosed() bool {
 	select {
 	case <-c.done:
@@ -158,8 +140,17 @@ func (c *Conn) IsClosed() bool {
 	}
 }
 
+// readLoop reads messages from the daemon and forwards them to the Messages channel.
 func (c *Conn) readLoop() {
-	defer c.Close()
+	defer func() {
+		c.closeOnce.Do(func() {
+			close(c.done)
+			close(c.Messages)
+		})
+		if c.inner != nil {
+			_ = c.inner.Close()
+		}
+	}()
 
 	for {
 		select {
@@ -168,18 +159,17 @@ func (c *Conn) readLoop() {
 		default:
 		}
 
-		if !c.reader.Scan() {
-			return
-		}
-
-		var env Envelope
-		if err := json.Unmarshal(c.reader.Bytes(), &env); err != nil {
+		resp, err := c.inner.ReadResponse("")
+		if err != nil {
+			if c.IsClosed() {
+				return
+			}
 			continue
 		}
-
 		select {
-		case c.Messages <- env:
-		default:
+		case c.Messages <- Envelope(resp):
+		case <-c.done:
+			return
 		}
 	}
 }

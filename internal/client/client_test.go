@@ -10,15 +10,15 @@ func TestNewClient(t *testing.T) {
 	if c == nil {
 		t.Fatal("expected client")
 	}
-	if c.Address != "/tmp/test.sock" {
-		t.Fatalf("expected /tmp/test.sock, got %s", c.Address)
+	if c.Address() != "/test.sock" {
+		t.Fatalf("expected /tmp/test.sock, got %s", c.Address())
 	}
 }
 
 func TestDefaultAddress(t *testing.T) {
 	c := New("")
-	if c.Address != "/cognitiveos/run/daemon.sock" {
-		t.Fatalf("expected default socket path, got %s", c.Address)
+	if c.Address() != "/cognitiveos/run/daemon.sock" {
+		t.Fatalf("expected default socket path, got %s", c.Address())
 	}
 }
 
