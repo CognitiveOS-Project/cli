@@ -6,93 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.Alt && (msg.String() == "s" || msg.String() == "ctrl+s") {
-		_ = m.conn.SendSystemCode("security", "")
-		return m, nil
-	}
-	if msg.String() == "ctrl+alt+s" {
-		_ = m.conn.SendSystemCode("security", "")
-		return m, nil
-	}
-
-	switch m.state {
-	case StateIdle:
-		return m.handleIdleKey(msg)
-	case StateListening:
-		return m.handleListeningKey(msg)
-	case StateVoiceRecording:
-		return m.handleVoiceRecordingKey(msg)
-	case StateProcessing:
-		return m.handleProcessingKey(msg)
-	case StateResponding:
-		return m.handleRespondingKey(msg)
-	case StateError:
-		return m.handleErrorKey(msg)
-	case StateCodeEntry:
-		return m.handleCodeEntryKey(msg)
-	default:
-		return m, nil
-	}
-}
-
-func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "ctrl+c":
-		return m, tea.Quit
-	case "ctrl+d":
-		m.confirming = true
-		return m, nil
-	case "y", "Y":
-		if m.confirming {
-			m.confirming = false
-			_ = m.conn.SendSystemCode("idle", "")
-			return m, nil
-		}
-		m.state = StateListening
-		m.input.WriteString(msg.String())
-		return m, nil
-	case "n", "N":
-		m.confirming = false
-		return m, nil
-	case "/":
-		if err := m.conn.SendVoice(); err != nil {
-			m.state = StateError
-			m.errMsg = "failed to send voice command: " + err.Error()
-			return m, nil
-		}
-		m.state = StateVoiceRecording
-		m.waveformIdx = 0
-		return m, spinnerTickCmd()
-	case " ":
-		if m.confirming {
-			return m, nil
-		}
-		m.input.WriteString(" ")
-		m.state = StateListening
-		return m, nil
-	default:
-		if m.confirming {
-			return m, nil
-		}
-		if msg.Type == tea.KeyRunes {
-			m.input.WriteString(msg.String())
-			m.state = StateListening
-		}
-		return m, nil
-	}
-}
-
-func (m Model) handleVoiceRecordingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "ctrl+c":
-		m.state = StateIdle
-		return m, nil
-	default:
-		return m, nil
-	}
-}
-
+// handleListeningKey handles key input while in listening state.
 func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
@@ -150,12 +64,23 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+l":
 		return m, tea.ClearScreen
 
+	case " ":
+		if m.confirming {
+			return m, nil
+		}
+		m.input.WriteString(" ")
+		return m, nil
+
 	case "/":
 		if err := m.conn.SendVoice(); err != nil {
 			m.state = StateError
 			m.errMsg = "failed to send voice command: " + err.Error()
+			return m, nil
 		}
-		return m, nil
+		m.state = StateVoiceRecording
+		m.waveformIdx = 0
+		return m, spinnerTickCmd()
+
 	default:
 		if msg.Type == tea.KeyRunes {
 			m.input.WriteString(msg.String())
@@ -164,17 +89,69 @@ func (m Model) handleListeningKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleProcessingKey handles key input while in processing state.
 func (m Model) handleProcessingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "esc":
-		m.state = StateIdle
+	case "enter":
+		input := m.input.String()
+		if input == "" {
+			return m, nil
+		}
+		m.output.Reset()
+		m.output.WriteString(input)
+		m.history = append(m.history, input)
+		m.historyIdx = len(m.history)
 		m.input.Reset()
-		_ = m.conn.SendSystemCode("cancel", "")
-		return m, cancelProcessingCmd()
+		m.state = StateProcessing
+		_ = m.conn.SendInput(input)
+		_ = m.conn.RequestStatus()
+		return m, nil
+
+	case "esc":
+		m.input.Reset()
+		m.state = StateIdle
+		return m, nil
+
+	case "ctrl+c":
+		m.input.Reset()
+		m.state = StateIdle
+		return m, nil
+
 	case "ctrl+l":
 		return m, tea.ClearScreen
+
 	case " ":
+		if m.confirming {
+			return m, nil
+		}
 		m.input.WriteString(" ")
+		return m, nil
+
+	case "up":
+		if len(m.history) > 0 && m.historyIdx > 0 {
+			m.historyIdx--
+			m.input.Reset()
+			m.input.WriteString(m.history[m.historyIdx])
+		}
+		return m, nil
+
+	case "down":
+		if m.historyIdx < len(m.history)-1 {
+			m.historyIdx++
+			m.input.Reset()
+			m.input.WriteString(m.history[m.historyIdx])
+		} else {
+			m.input.Reset()
+			m.historyIdx = len(m.history)
+		}
+		return m, nil
+
+	case "backspace":
+		s := m.input.String()
+		if len(s) > 0 {
+			m.input.Reset()
+			m.input.WriteString(s[:len(s)-1])
+		}
 		return m, nil
 	default:
 		if msg.Type == tea.KeyRunes {
@@ -184,12 +161,7 @@ func (m Model) handleProcessingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func cancelProcessingCmd() tea.Cmd {
-	return func() tea.Msg {
-		return cancelProcessingMsg{}
-	}
-}
-
+// handleRespondingKey handles key input while in responding state.
 func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
@@ -218,17 +190,6 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if input == "" {
 			return m, nil
 		}
-		lower := strings.ToLower(input)
-		if lower == "close" || lower == "close_media" {
-			if m.state == StateMedia {
-				m.state = StateResponding
-				m.input.Reset()
-			}
-			return m, nil
-		}
-		if lower == "save" && m.state == StateMedia {
-			return m, nil
-		}
 		m.output.Reset()
 		m.output.WriteString(input)
 		m.scrollOffset = 0
@@ -250,53 +211,79 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.output.Reset()
 		return m, nil
 
-	case "ctrl+c":
-		m.state = StateIdle
-		m.input.Reset()
-		return m, nil
-
-	case "tab":
-		if m.showActions {
-			m.actionIdx = (m.actionIdx + 1) % len(m.actions)
-		} else {
-			m.showActions = true
-			m.actionIdx = 0
-		}
-		return m, nil
-
-	case "shift+up":
-		if m.scrollOffset > 0 {
-			m.scrollOffset--
-		}
-		return m, nil
-
-	case "shift+down":
-		lines := strings.Split(m.output.String(), "\n")
-		if m.scrollOffset < len(lines)-1 {
-			m.scrollOffset++
-		}
-		return m, nil
-
-	case "pgup":
-		m.scrollOffset -= m.height / 2
-		if m.scrollOffset < 0 {
-			m.scrollOffset = 0
-		}
-		return m, nil
-
-	case "pgdown":
-		lines := strings.Split(m.output.String(), "\n")
-		m.scrollOffset += m.height / 2
-		if m.scrollOffset >= len(lines) {
-			m.scrollOffset = len(lines) - 1
-		}
-		if m.scrollOffset < 0 {
-			m.scrollOffset = 0
-		}
-		return m, nil
+	case "ctrl+l":
+		return m, tea.ClearScreen
 
 	case " ":
+		if m.confirming {
+			return m, nil
+		}
 		m.input.WriteString(" ")
+		return m, nil
+
+	case "up":
+		if len(m.history) > 0 && m.historyIdx > 0 {
+			m.historyIdx--
+			m.input.Reset()
+			m.input.WriteString(m.history[m.historyIdx])
+		}
+		return m, nil
+
+	case "down":
+		if m.historyIdx < len(m.history)-1 {
+			m.historyIdx++
+			m.input.Reset()
+			m.input.WriteString(m.history[m.historyIdx])
+		} else {
+			m.input.Reset()
+			m.historyIdx = len(m.history)
+		}
+		return m, nil
+
+	case "backspace":
+		s := m.input.String()
+		if len(s) > 0 {
+			m.input.Reset()
+			m.input.WriteString(s[:len(s)-1])
+		}
+		return m, nil
+
+	default:
+		if msg.Type == tea.KeyRunes {
+			m.input.WriteString(msg.String())
+		}
+		return m, nil
+	}
+}
+
+// handleIdleKey handles key input while in idle state.
+func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		input := m.input.String()
+		if input == "" {
+			return m, nil
+		}
+		m.output.Reset()
+		m.output.WriteString(input)
+		m.history = append(m.history, input)
+		m.historyIdx = len(m.history)
+		m.input.Reset()
+		m.state = StateProcessing
+		_ = m.conn.SendInput(input)
+		_ = m.conn.RequestStatus()
+		return m, nil
+
+	case "esc":
+		m.input.Reset()
+		m.state = StateIdle
+		return m, nil
+
+	case "ctrl+c":
+		m.input.Reset()
+		return m, nil
+	case "ctrl+d":
+		m.confirming = true
 		return m, nil
 
 	case "up":
@@ -328,6 +315,38 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "ctrl+l":
 		return m, tea.ClearScreen
+	case "h", "H":
+		m.state = StateListening
+		m.input.WriteString("h")
+		return m, nil
+
+	case "y", "Y":
+		if m.confirming {
+			m.confirming = false
+			_ = m.conn.SendSystemCode("idle", "")
+			return m, nil
+		}
+		m.state = StateListening
+		m.input.WriteString("y")
+		return m, nil
+
+	case "/":
+		if err := m.conn.SendVoice(); err != nil {
+			m.state = StateError
+			m.errMsg = "failed to send voice command: " + err.Error()
+			return m, nil
+		}
+		m.state = StateVoiceRecording
+		m.waveformIdx = 0
+		return m, spinnerTickCmd()
+
+	case " ":
+		if m.confirming {
+			return m, nil
+		}
+		m.input.WriteString(" ")
+		m.state = StateListening
+		return m, nil
 
 	default:
 		if msg.Type == tea.KeyRunes {
@@ -337,30 +356,38 @@ func (m Model) handleRespondingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleVoiceRecordingKey handles key input while in voice recording state.
+func (m Model) handleVoiceRecordingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.state = StateIdle
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
+// handleErrorKey handles key input while in error state.
 func (m Model) handleErrorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.state = StateIdle
-		m.errMsg = ""
-		m.suggestion = ""
 		m.input.Reset()
 		return m, nil
 
 	case "enter":
 		input := m.input.String()
-		if input != "" {
-			m.output.Reset()
-			m.output.WriteString(input)
-			m.history = append(m.history, input)
-			m.historyIdx = len(m.history)
-			m.input.Reset()
-			m.state = StateProcessing
-			_ = m.conn.SendInput(input)
-		} else {
-			m.state = StateIdle
+		if input == "" {
+			return m, nil
 		}
-		m.errMsg = ""
-		m.suggestion = ""
+		m.output.Reset()
+		m.output.WriteString(input)
+		m.history = append(m.history, input)
+		m.historyIdx = len(m.history)
+		m.input.Reset()
+		m.state = StateProcessing
+		_ = m.conn.SendInput(input)
+		_ = m.conn.RequestStatus()
 		return m, nil
 
 	case "backspace":
@@ -383,34 +410,33 @@ func (m Model) handleErrorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleCodeEntryKey handles key input while in code entry state.
 func (m Model) handleCodeEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		code := m.codeInput.String()
+		code := m.input.String()
 		if len(code) >= 4 {
 			_ = m.conn.SendSystemCode("unlock", code)
-			m.codeInput.Reset()
+			m.input.Reset()
 			m.state = StateIdle
 		}
 		return m, nil
 
 	case "esc":
-		m.codeInput.Reset()
+		m.input.Reset()
 		m.state = StateIdle
 		return m, nil
 
 	case "backspace":
-		s := m.codeInput.String()
+		s := m.input.String()
 		if len(s) > 0 {
-			m.codeInput.Reset()
-			m.codeInput.WriteString(s[:len(s)-1])
+			m.input.Reset()
+			m.input.WriteString(s[:len(s)-1])
 		}
 		return m, nil
 
-	case "-":
-		if m.codeInput.Len() > 0 && !strings.HasSuffix(m.codeInput.String(), "-") {
-			m.codeInput.WriteString("-")
-		}
+	case " ":
+		m.input.WriteString(" ")
 		return m, nil
 
 	default:
@@ -421,6 +447,37 @@ func (m Model) handleCodeEntryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		return m, nil
+	}
+}
+
+// handleKey dispatches key input to the appropriate state handler.
+func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Alt && (msg.String() == "s" || msg.String() == "ctrl+s") {
+		_ = m.conn.SendSystemCode("security", "")
+		return m, nil
+	}
+	if msg.String() == "ctrl+alt+s" {
+		_ = m.conn.SendSystemCode("security", "")
+		return m, nil
+	}
+
+	switch m.state {
+	case StateIdle:
+		return m.handleIdleKey(msg)
+	case StateListening:
+		return m.handleListeningKey(msg)
+	case StateVoiceRecording:
+		return m.handleVoiceRecordingKey(msg)
+	case StateProcessing:
+		return m.handleProcessingKey(msg)
+	case StateResponding:
+		return m.handleRespondingKey(msg)
+	case StateError:
+		return m.handleErrorKey(msg)
+	case StateCodeEntry:
+		return m.handleCodeEntryKey(msg)
+	default:
 		return m, nil
 	}
 }

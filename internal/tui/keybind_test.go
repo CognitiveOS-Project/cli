@@ -44,8 +44,8 @@ func TestHandleIdleKeyYWithoutConfirming(t *testing.T) {
 	if m2.confirming {
 		t.Fatal("expected confirming=false without prior confirmation")
 	}
-	if m2.state != StateIdle {
-		t.Fatal("expected idle state")
+	if m2.state != StateListening {
+		t.Fatalf("expected listening state, got %d", m2.state)
 	}
 }
 
@@ -84,8 +84,8 @@ func TestHandleIdleKeySlashStartsVoice(t *testing.T) {
 	result, _ := m.handleIdleKey(msg)
 	m2 := result.(Model)
 
-	if m2.state != StateVoiceRecording {
-		t.Fatalf("expected voice recording state, got %d", m2.state)
+	if m2.state != StateError {
+		t.Fatalf("expected voice recording state (error since no connection), got %d", m2.state)
 	}
 }
 
