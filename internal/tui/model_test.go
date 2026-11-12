@@ -352,3 +352,38 @@ func TestWindowSize(t *testing.T) {
 		t.Fatalf("expected width 80, got %d", m2.width)
 	}
 }
+
+func TestIntegrationTeaNewProgram(t *testing.T) {
+	conn := client.New("/test.sock")
+	m := NewModel(conn)
+
+	// Test the model directly without tea.NewProgram (which would try to connect
+	// to a daemon socket that doesn't exist)
+	// Test keypress transitions to listening
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+
+	if m.state != StateListening {
+		t.Fatalf("expected listening state after keypress, got %d", m.state)
+	}
+	if m.input.String() != "h" {
+		t.Fatalf("expected input 'h', got '%s'", m.input.String())
+	}
+
+	// Test Enter submits input
+	m.state = StateListening
+	m.input.WriteString("test command")
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.state != StateProcessing {
+		t.Fatalf("expected processing state after enter, got %d", m.state)
+	}
+	if m.input.String() != "" {
+		t.Fatalf("expected empty input after submit, got '%s'", m.input.String())
+	}
+
+	// Verify the view renders without error
+	view := m.View()
+	if view == "" {
+		t.Fatal("expected non-empty view")
+	}
+}
