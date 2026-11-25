@@ -1,6 +1,6 @@
 module github.com/CognitiveOS-Project/cli
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/CognitiveOS-Project/cogsdk v0.0.0
+	github.com/CognitiveOS-Project/cogsdk v1.1.3
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/x/ansi v0.10.1 // indirect
@@ -27,5 +27,3 @@ require (
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
-
-replace github.com/CognitiveOS-Project/cogsdk => /workspace/cogsdk
