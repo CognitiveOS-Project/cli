@@ -357,42 +357,32 @@ func TestIntegrationTeaNewProgram(t *testing.T) {
 	conn := client.New("/test.sock")
 	m := NewModel(conn)
 
-	// Create a Bubble Tea program with the model
-	p := tea.NewProgram(m, tea.WithOutput(&strings.Builder{}))
+	// Test the model directly without tea.NewProgram (which would try to connect
+	// to a daemon socket that doesn't exist)
+	// Test keypress transitions to listening
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
 
-	// Send a keypress to transition to listening state
-	p.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
-
-	// Verify the model updated correctly by checking the current state
-	// through a fresh Update call (tea.NewProgram doesn't expose internal state)
-	m2 := m
-	m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
-
-	if m2.state != StateListening {
-		t.Fatalf("expected listening state after keypress, got %d", m2.state)
+	if m.state != StateListening {
+		t.Fatalf("expected listening state after keypress, got %d", m.state)
 	}
-	if m2.input.String() != "h" {
-		t.Fatalf("expected input 'h', got '%s'", m2.input.String())
+	if m.input.String() != "h" {
+		t.Fatalf("expected input 'h', got '%s'", m.input.String())
 	}
 
-	// Send Enter to submit input
-	m2.state = StateListening
-	m2.input.WriteString("test command")
-	p2 := tea.NewProgram(m2, tea.WithOutput(&strings.Builder{}))
-	p2.Send(tea.KeyMsg{Type: tea.KeyEnter})
+	// Test Enter submits input
+	m.state = StateListening
+	m.input.WriteString("test command")
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
-	m3 := m2
-	m3.Update(tea.KeyMsg{Type: tea.KeyEnter})
-
-	if m3.state != StateProcessing {
-		t.Fatalf("expected processing state after enter, got %d", m3.state)
+	if m.state != StateProcessing {
+		t.Fatalf("expected processing state after enter, got %d", m.state)
 	}
-	if m3.input.String() != "" {
-		t.Fatalf("expected empty input after submit, got '%s'", m3.input.String())
+	if m.input.String() != "" {
+		t.Fatalf("expected empty input after submit, got '%s'", m.input.String())
 	}
 
 	// Verify the view renders without error
-	view := m3.View()
+	view := m.View()
 	if view == "" {
 		t.Fatal("expected non-empty view")
 	}
