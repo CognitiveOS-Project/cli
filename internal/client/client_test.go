@@ -6,19 +6,19 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
-	c := New("/tmp/test.sock")
+	c := New("/test.sock")
 	if c == nil {
 		t.Fatal("expected client")
 	}
-	if c.Address() != "/test.sock" {
-		t.Fatalf("expected /tmp/test.sock, got %s", c.Address())
+	if c.Address != "/test.sock" {
+		t.Fatalf("expected /test.sock, got %s", c.Address)
 	}
 }
 
 func TestDefaultAddress(t *testing.T) {
 	c := New("")
-	if c.Address() != "/cognitiveos/run/daemon.sock" {
-		t.Fatalf("expected default socket path, got %s", c.Address())
+	if c.Address != "/cognitiveos/run/daemon.sock" {
+		t.Fatalf("expected default socket path, got %s", c.Address)
 	}
 }
 
