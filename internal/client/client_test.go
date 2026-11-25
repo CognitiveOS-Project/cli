@@ -6,12 +6,12 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
-	c := New("/tmp/test.sock")
+	c := New("/test.sock")
 	if c == nil {
 		t.Fatal("expected client")
 	}
 	if c.Address() != "/test.sock" {
-		t.Fatalf("expected /tmp/test.sock, got %s", c.Address())
+		t.Fatalf("expected /test.sock, got %s", c.Address())
 	}
 }
 
