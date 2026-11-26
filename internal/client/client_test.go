@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
-	c := New("/tmp/test.sock")
+	c := New("/test.sock")
 	if c == nil {
 		t.Fatal("expected client")
 	}

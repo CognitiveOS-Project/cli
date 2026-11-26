@@ -36,12 +36,12 @@ type Model struct {
 	state        State
 	connStatus   connectionStatus
 	conn         *client.Conn
-	input        strings.Builder
-	output       strings.Builder
+	input        *strings.Builder
+	output       *strings.Builder
 	lastOutput   string
 	errMsg       string
 	suggestion   string
-	codeInput    strings.Builder
+	codeInput    *strings.Builder
 	history      []string
 	historyIdx   int
 	spinnerIdx   int
@@ -79,6 +79,9 @@ func NewModel(conn *client.Conn) Model {
 		state:          StateIdle,
 		conn:           conn,
 		connStatus:     ConnDisconnected,
+		input:          &strings.Builder{},
+		output:         &strings.Builder{},
+		codeInput:      &strings.Builder{},
 		spinnerChars:   []string{".", "..", "..."},
 		actions:        []string{},
 		waveformFrames: []string{"▁", "▁▂", "▃", "▄", "▅", "▆", "▇", "█"},
