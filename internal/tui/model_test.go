@@ -360,7 +360,9 @@ func TestIntegrationTeaNewProgram(t *testing.T) {
 	// Test the model directly without tea.NewProgram (which would try to connect
 	// to a daemon socket that doesn't exist)
 	// Test keypress transitions to listening
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	var updated tea.Model
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	m = updated.(Model)
 
 	if m.state != StateListening {
 		t.Fatalf("expected listening state after keypress, got %d", m.state)
@@ -372,7 +374,9 @@ func TestIntegrationTeaNewProgram(t *testing.T) {
 	// Test Enter submits input
 	m.state = StateListening
 	m.input.WriteString("test command")
-	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	var updated2 tea.Model
+	updated2, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated2.(Model)
 
 	if m.state != StateProcessing {
 		t.Fatalf("expected processing state after enter, got %d", m.state)
